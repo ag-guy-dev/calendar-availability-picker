@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 const APP_CONFIG = {
   // Azure AD "Application (client) ID" from the app registration.
-  clientId: "2d3998ad-f0c3-449e-adfd-01167a0952a1",
+  clientId: "d6c03c94-2795-4c52-8593-74690446ebed",
 
   // "consumers" = personal Microsoft accounts only. Use "common" instead
   // if you might ever want to sign in with a work/school account too.
