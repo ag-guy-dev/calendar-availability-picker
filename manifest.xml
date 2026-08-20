@@ -13,9 +13,9 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Availability Picker" />
   <Description DefaultValue="Pick open times from your Outlook calendar and drop them into an email as a list, without a voting link." />
-  <IconUrl DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/assets/icon-80.png" />
-  <SupportUrl DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/support.html" />
+  <IconUrl DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/assets/icon-80.png" />
+  <SupportUrl DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/support.html" />
 
   <AppDomains>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
@@ -35,7 +35,7 @@
   <FormSettings>
     <Form xsi:type="ItemEdit">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/taskpane.html" />
+        <SourceLocation DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/taskpane.html" />
       </DesktopSettings>
     </Form>
   </FormSettings>
@@ -85,13 +85,13 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/assets/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/assets/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/assets/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/commands.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ag-guy-dev.github.io/calendar-availability-picker/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Availability" />
