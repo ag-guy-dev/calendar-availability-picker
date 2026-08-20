@@ -32,13 +32,6 @@
         </select>
       </div>
       <div class="row">
-        <label for="duration-select">Slot length</label>
-        <select id="duration-select">
-          <option value="30">30 minutes</option>
-          <option value="60" selected>60 minutes</option>
-        </select>
-      </div>
-      <div class="row">
         <label for="hours-select">Business hours</label>
         <select id="hours-select">
           <option value="8-17" selected>8 AM – 5 PM</option>
@@ -46,11 +39,15 @@
           <option value="7-19">7 AM – 7 PM</option>
         </select>
       </div>
-      <button id="load-btn" class="secondary-btn">Find open times</button>
+      <button id="load-btn" class="secondary-btn">Show my calendar</button>
     </section>
 
     <section id="slots-section" class="hidden">
-      <p class="hint">Check the times you want to offer, then insert them into the email.</p>
+      <p class="hint">Click open time on the calendar to select it (30-min increments — click adjacent slots to build a longer block), then insert it into the email.</p>
+      <div id="calendar-legend">
+        <span><i class="swatch busy"></i> Busy</span>
+        <span><i class="swatch selected"></i> Selected</span>
+      </div>
       <div id="slots-list"></div>
       <button id="insert-btn" class="primary-btn" disabled>Insert selected times into email</button>
     </section>
