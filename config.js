@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 const APP_CONFIG = {
   // Azure AD "Application (client) ID" from the app registration.
-  clientId: "REPLACE_WITH_AZURE_AD_APPLICATION_CLIENT_ID",
+  clientId: "2d3998ad-f0c3-449e-adfd-01167a0952a1",
 
   // "consumers" = personal Microsoft accounts only. Use "common" instead
   // if you might ever want to sign in with a work/school account too.
@@ -13,7 +13,7 @@ const APP_CONFIG = {
 
   // Must exactly match a Redirect URI (type: Single-page application)
   // configured on the Azure AD app registration.
-  redirectUri: "https://REPLACE_WITH_YOUR_HOSTED_DOMAIN/taskpane.html",
+  redirectUri: "https://ag-guy-dev.github.io/calendar-availability-picker/taskpane.html",
 
   // Delegated Graph permission needed to read free/busy + events.
   graphScopes: ["Calendars.Read"],
