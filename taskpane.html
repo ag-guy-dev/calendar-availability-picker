@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Availability Picker</title>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <main id="app">
+    <header>
+      <h1>Pick your available times</h1>
+      <p class="subtitle">Choose openings from your calendar to drop into this email as plain text.</p>
+    </header>
+
+    <section id="signin-section">
+      <button id="signin-btn" class="primary-btn">Sign in to load my calendar</button>
+      <p id="signin-status" class="status"></p>
+    </section>
+
+    <section id="controls-section" class="hidden">
+      <div class="row">
+        <label for="range-select">Look ahead</label>
+        <select id="range-select">
+          <option value="3">Next 3 days</option>
+          <option value="5" selected>This week (5 business days)</option>
+          <option value="10">Next 2 weeks</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="duration-select">Slot length</label>
+        <select id="duration-select">
+          <option value="30">30 minutes</option>
+          <option value="60" selected>60 minutes</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="hours-select">Business hours</label>
+        <select id="hours-select">
+          <option value="8-17" selected>8 AM – 5 PM</option>
+          <option value="9-17">9 AM – 5 PM</option>
+          <option value="7-19">7 AM – 7 PM</option>
+        </select>
+      </div>
+      <button id="load-btn" class="secondary-btn">Find open times</button>
+    </section>
+
+    <section id="slots-section" class="hidden">
+      <p class="hint">Check the times you want to offer, then insert them into the email.</p>
+      <div id="slots-list"></div>
+      <button id="insert-btn" class="primary-btn" disabled>Insert selected times into email</button>
+    </section>
+
+    <p id="error-msg" class="error hidden"></p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="taskpane.js"></script>
+</body>
+</html>
