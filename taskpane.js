@@ -82,9 +82,23 @@ function businessDayRange(lookaheadDays, startHour, endHour) {
   return days;
 }
 
-async function fetchBusyEvents(token, rangeStartISO, rangeEndISO) {
+async function fetchCalendarIds(token) {
+  const resp = await fetch(`${APP_CONFIG.graphBaseUrl}/me/calendars?$select=id,name`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Graph error ${resp.status}: ${text}`);
+  }
+
+  const data = await resp.json();
+  return (data.value || []).map((c) => c.id);
+}
+
+async function fetchCalendarViewEvents(token, calendarId, rangeStartISO, rangeEndISO) {
   const url =
-    `${APP_CONFIG.graphBaseUrl}/me/calendarView` +
+    `${APP_CONFIG.graphBaseUrl}/me/calendars/${calendarId}/calendarView` +
     `?startDateTime=${encodeURIComponent(rangeStartISO)}` +
     `&endDateTime=${encodeURIComponent(rangeEndISO)}` +
     `&$select=subject,start,end,showAs,isAllDay` +
@@ -103,7 +117,20 @@ async function fetchBusyEvents(token, rangeStartISO, rangeEndISO) {
   }
 
   const data = await resp.json();
-  return (data.value || []).filter(
+  return data.value || [];
+}
+
+// Pulls busy time from every calendar the signed-in account has (not just the
+// default one), so events synced in from a connected non-Microsoft account
+// (e.g. a linked Gmail calendar) are included if Graph exposes them at all.
+async function fetchBusyEvents(token, rangeStartISO, rangeEndISO) {
+  const calendarIds = await fetchCalendarIds(token);
+
+  const eventsPerCalendar = await Promise.all(
+    calendarIds.map((id) => fetchCalendarViewEvents(token, id, rangeStartISO, rangeEndISO))
+  );
+
+  return eventsPerCalendar.flat().filter(
     (e) => !e.isAllDay && ["busy", "tentative", "oof"].includes((e.showAs || "").toLowerCase())
   );
 }
@@ -159,191 +186,4 @@ function renderDayTimeline(dayStart, dayEnd, busyEvents) {
   const totalMinutes = minutesFrom(dayStart, dayEnd);
   const busyRanges = mergeBusyRanges(busyEvents, dayStart, dayEnd);
   const now = new Date();
-  const pastEnd = now > dayStart ? (now < dayEnd ? now : dayEnd) : dayStart;
-
-  const groupEl = document.createElement("div");
-  groupEl.className = "day-group";
-  const heading = document.createElement("h3");
-  heading.textContent = dayLabel;
-  groupEl.appendChild(heading);
-
-  const timelineEl = document.createElement("div");
-  timelineEl.className = "timeline";
-  timelineEl.style.height = `${totalMinutes * PX_PER_MIN}px`;
-
-  // Hour gridlines + labels.
-  for (let m = 0; m <= totalMinutes; m += 60) {
-    const hourDate = new Date(dayStart.getTime() + m * 60000);
-    const markEl = document.createElement("div");
-    markEl.className = "hour-mark";
-    markEl.style.top = `${m * PX_PER_MIN}px`;
-    const labelEl = document.createElement("span");
-    labelEl.className = "hour-label";
-    labelEl.textContent = formatTime(hourDate);
-    markEl.appendChild(labelEl);
-    timelineEl.appendChild(markEl);
-  }
-
-  // Past-time shading.
-  if (pastEnd > dayStart) {
-    const pastEl = document.createElement("div");
-    pastEl.className = "past-block";
-    pastEl.style.top = "0px";
-    pastEl.style.height = `${minutesFrom(dayStart, pastEnd) * PX_PER_MIN}px`;
-    timelineEl.appendChild(pastEl);
-  }
-
-  // Busy blocks.
-  busyRanges.forEach((r) => {
-    const busyEl = document.createElement("div");
-    busyEl.className = "busy-block";
-    busyEl.style.top = `${minutesFrom(dayStart, r.start) * PX_PER_MIN}px`;
-    busyEl.style.height = `${minutesFrom(r.start, r.end) * PX_PER_MIN}px`;
-    busyEl.title = r.subjects.join(", ");
-    if (minutesFrom(r.start, r.end) * PX_PER_MIN >= 16) {
-      busyEl.textContent = r.subjects.join(", ");
-    }
-    timelineEl.appendChild(busyEl);
-  });
-
-  // Free, selectable 30-min cells (clock-aligned to the day start).
-  let cellStart = new Date(dayStart);
-  while (cellStart < dayEnd) {
-    const cellEnd = new Date(Math.min(cellStart.getTime() + CELL_MINUTES * 60000, dayEnd.getTime()));
-    const isPast = cellEnd <= pastEnd;
-    const isBusy = busyRanges.some((r) => overlaps(cellStart, cellEnd, r.start, r.end));
-
-    if (!isPast && !isBusy) {
-      const cellEl = document.createElement("div");
-      cellEl.className = "free-cell";
-      cellEl.style.top = `${minutesFrom(dayStart, cellStart) * PX_PER_MIN}px`;
-      cellEl.style.height = `${minutesFrom(cellStart, cellEnd) * PX_PER_MIN}px`;
-      cellEl.textContent = `${formatTime(cellStart)} – ${formatTime(cellEnd)}`;
-
-      const cell = {
-        start: new Date(cellStart),
-        end: new Date(cellEnd),
-        dayLabel,
-        el: cellEl,
-        selected: false,
-      };
-      cellEl.addEventListener("click", () => {
-        cell.selected = !cell.selected;
-        cellEl.classList.toggle("selected", cell.selected);
-        updateInsertButton();
-      });
-      allCells.push(cell);
-      timelineEl.appendChild(cellEl);
-    }
-
-    cellStart = cellEnd;
-  }
-
-  groupEl.appendChild(timelineEl);
-  return groupEl;
-}
-
-async function loadAvailability() {
-  clearError();
-  const loadBtn = document.getElementById("load-btn");
-  loadBtn.disabled = true;
-  loadBtn.textContent = "Loading...";
-
-  try {
-    const lookaheadDays = parseInt(document.getElementById("range-select").value, 10);
-    const [startHour, endHour] = document
-      .getElementById("hours-select")
-      .value.split("-")
-      .map(Number);
-
-    const token = await getGraphToken();
-    const days = businessDayRange(lookaheadDays, startHour, endHour);
-
-    if (days.length === 0) {
-      showError("No business days found in range — try a longer lookahead.");
-      return;
-    }
-
-    const rangeStartISO = days[0].dayStart.toISOString();
-    const rangeEndISO = days[days.length - 1].dayEnd.toISOString();
-    const busyEvents = await fetchBusyEvents(token, rangeStartISO, rangeEndISO);
-
-    allCells = [];
-    const listEl = document.getElementById("slots-list");
-    listEl.innerHTML = "";
-
-    days.forEach(({ dayStart, dayEnd }) => {
-      const dayEvents = busyEvents.filter((e) => {
-        const start = new Date(e.start.dateTime);
-        const end = new Date(e.end.dateTime);
-        return end > dayStart && start < dayEnd;
-      });
-      listEl.appendChild(renderDayTimeline(dayStart, dayEnd, dayEvents));
-    });
-
-    if (allCells.length === 0) {
-      showError("No open time found in that range with those business hours.");
-    }
-
-    document.getElementById("slots-section").classList.remove("hidden");
-    updateInsertButton();
-  } catch (err) {
-    showError("Couldn't load your calendar: " + err.message);
-  } finally {
-    loadBtn.disabled = false;
-    loadBtn.textContent = "Show my calendar";
-  }
-}
-
-function updateInsertButton() {
-  const anyChecked = allCells.some((c) => c.selected);
-  document.getElementById("insert-btn").disabled = !anyChecked;
-}
-
-// Merges adjacent selected 30-min cells (same day, back-to-back) into single ranges.
-function mergedSelectedRanges() {
-  const selected = allCells
-    .filter((c) => c.selected)
-    .sort((a, b) => a.start - b.start);
-
-  const ranges = [];
-  selected.forEach((c) => {
-    const last = ranges[ranges.length - 1];
-    if (last && last.dayLabel === c.dayLabel && last.end.getTime() === c.start.getTime()) {
-      last.end = c.end;
-    } else {
-      ranges.push({ dayLabel: c.dayLabel, start: c.start, end: c.end });
-    }
-  });
-  return ranges;
-}
-
-function insertIntoEmail() {
-  clearError();
-  const ranges = mergedSelectedRanges();
-  if (ranges.length === 0) return;
-
-  const byDay = {};
-  ranges.forEach((r) => {
-    if (!byDay[r.dayLabel]) byDay[r.dayLabel] = [];
-    byDay[r.dayLabel].push(`${formatTime(r.start)} – ${formatTime(r.end)}`);
-  });
-
-  let text = "Here are some times that work on my end:\n\n";
-  Object.keys(byDay).forEach((day) => {
-    text += `${day}\n`;
-    byDay[day].forEach((label) => { text += `  • ${label}\n`; });
-    text += "\n";
-  });
-  text += "Let me know what fits best for you.\n";
-
-  Office.context.mailbox.item.body.setSelectedDataAsync(
-    text,
-    { coercionType: Office.CoercionType.Text },
-    (result) => {
-      if (result.status === Office.AsyncResultStatus.Failed) {
-        showError("Couldn't insert text into the email: " + result.error.message);
-      }
-    }
-  );
-}
+  const
