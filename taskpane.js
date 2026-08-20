@@ -2,7 +2,11 @@
 
 let msalInstance;
 let graphAccount;
-let computedSlots = []; // { id, dayLabel, label, checked }
+
+const PX_PER_MIN = 1.5;
+const CELL_MINUTES = 30;
+
+let allCells = []; // { start: Date, end: Date, dayLabel, el, selected }
 
 Office.onReady(() => {
   msalInstance = new msal.PublicClientApplication({
@@ -104,31 +108,38 @@ async function fetchBusyEvents(token, rangeStartISO, rangeEndISO) {
   );
 }
 
-function computeFreeSlots(dayStart, dayEnd, busyEvents, durationMinutes) {
-  const busyRanges = busyEvents
-    .map((e) => ({ start: new Date(e.start.dateTime), end: new Date(e.end.dateTime) }))
+// Merges overlapping/adjacent busy events (clipped to the day's business hours)
+// into contiguous blocks, so back-to-back meetings render as one shape.
+function mergeBusyRanges(events, dayStart, dayEnd) {
+  const ranges = events
+    .map((e) => ({
+      start: new Date(e.start.dateTime),
+      end: new Date(e.end.dateTime),
+      subject: e.subject || "Busy",
+    }))
     .filter((r) => r.end > dayStart && r.start < dayEnd)
+    .map((r) => ({
+      start: r.start < dayStart ? dayStart : r.start,
+      end: r.end > dayEnd ? dayEnd : r.end,
+      subjects: [r.subject],
+    }))
     .sort((a, b) => a.start - b.start);
 
-  const free = [];
-  let cursor = new Date(Math.max(dayStart.getTime(), new Date().getTime()));
-
-  for (const busy of busyRanges) {
-    if (busy.start > cursor) addSlotsInGap(free, cursor, busy.start, durationMinutes);
-    if (busy.end > cursor) cursor = busy.end;
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r.start <= last.end) {
+      if (r.end > last.end) last.end = r.end;
+      if (!last.subjects.includes(r.subjects[0])) last.subjects.push(r.subjects[0]);
+    } else {
+      merged.push(r);
+    }
   }
-  if (cursor < dayEnd) addSlotsInGap(free, cursor, dayEnd, durationMinutes);
-  return free;
+  return merged;
 }
 
-function addSlotsInGap(free, gapStart, gapEnd, durationMinutes) {
-  const durationMs = durationMinutes * 60 * 1000;
-  let slotStart = new Date(gapStart);
-  while (slotStart.getTime() + durationMs <= gapEnd.getTime()) {
-    const slotEnd = new Date(slotStart.getTime() + durationMs);
-    free.push({ start: new Date(slotStart), end: slotEnd });
-    slotStart = slotEnd;
-  }
+function minutesFrom(dayStart, date) {
+  return (date.getTime() - dayStart.getTime()) / 60000;
 }
 
 function formatTime(d) {
@@ -139,6 +150,99 @@ function formatDayLabel(d) {
   return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
 
+function overlaps(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && aEnd > bStart;
+}
+
+function renderDayTimeline(dayStart, dayEnd, busyEvents) {
+  const dayLabel = formatDayLabel(dayStart);
+  const totalMinutes = minutesFrom(dayStart, dayEnd);
+  const busyRanges = mergeBusyRanges(busyEvents, dayStart, dayEnd);
+  const now = new Date();
+  const pastEnd = now > dayStart ? (now < dayEnd ? now : dayEnd) : dayStart;
+
+  const groupEl = document.createElement("div");
+  groupEl.className = "day-group";
+  const heading = document.createElement("h3");
+  heading.textContent = dayLabel;
+  groupEl.appendChild(heading);
+
+  const timelineEl = document.createElement("div");
+  timelineEl.className = "timeline";
+  timelineEl.style.height = `${totalMinutes * PX_PER_MIN}px`;
+
+  // Hour gridlines + labels.
+  for (let m = 0; m <= totalMinutes; m += 60) {
+    const hourDate = new Date(dayStart.getTime() + m * 60000);
+    const markEl = document.createElement("div");
+    markEl.className = "hour-mark";
+    markEl.style.top = `${m * PX_PER_MIN}px`;
+    const labelEl = document.createElement("span");
+    labelEl.className = "hour-label";
+    labelEl.textContent = formatTime(hourDate);
+    markEl.appendChild(labelEl);
+    timelineEl.appendChild(markEl);
+  }
+
+  // Past-time shading.
+  if (pastEnd > dayStart) {
+    const pastEl = document.createElement("div");
+    pastEl.className = "past-block";
+    pastEl.style.top = "0px";
+    pastEl.style.height = `${minutesFrom(dayStart, pastEnd) * PX_PER_MIN}px`;
+    timelineEl.appendChild(pastEl);
+  }
+
+  // Busy blocks.
+  busyRanges.forEach((r) => {
+    const busyEl = document.createElement("div");
+    busyEl.className = "busy-block";
+    busyEl.style.top = `${minutesFrom(dayStart, r.start) * PX_PER_MIN}px`;
+    busyEl.style.height = `${minutesFrom(r.start, r.end) * PX_PER_MIN}px`;
+    busyEl.title = r.subjects.join(", ");
+    if (minutesFrom(r.start, r.end) * PX_PER_MIN >= 16) {
+      busyEl.textContent = r.subjects.join(", ");
+    }
+    timelineEl.appendChild(busyEl);
+  });
+
+  // Free, selectable 30-min cells (clock-aligned to the day start).
+  let cellStart = new Date(dayStart);
+  while (cellStart < dayEnd) {
+    const cellEnd = new Date(Math.min(cellStart.getTime() + CELL_MINUTES * 60000, dayEnd.getTime()));
+    const isPast = cellEnd <= pastEnd;
+    const isBusy = busyRanges.some((r) => overlaps(cellStart, cellEnd, r.start, r.end));
+
+    if (!isPast && !isBusy) {
+      const cellEl = document.createElement("div");
+      cellEl.className = "free-cell";
+      cellEl.style.top = `${minutesFrom(dayStart, cellStart) * PX_PER_MIN}px`;
+      cellEl.style.height = `${minutesFrom(cellStart, cellEnd) * PX_PER_MIN}px`;
+      cellEl.textContent = `${formatTime(cellStart)} – ${formatTime(cellEnd)}`;
+
+      const cell = {
+        start: new Date(cellStart),
+        end: new Date(cellEnd),
+        dayLabel,
+        el: cellEl,
+        selected: false,
+      };
+      cellEl.addEventListener("click", () => {
+        cell.selected = !cell.selected;
+        cellEl.classList.toggle("selected", cell.selected);
+        updateInsertButton();
+      });
+      allCells.push(cell);
+      timelineEl.appendChild(cellEl);
+    }
+
+    cellStart = cellEnd;
+  }
+
+  groupEl.appendChild(timelineEl);
+  return groupEl;
+}
+
 async function loadAvailability() {
   clearError();
   const loadBtn = document.getElementById("load-btn");
@@ -147,7 +251,6 @@ async function loadAvailability() {
 
   try {
     const lookaheadDays = parseInt(document.getElementById("range-select").value, 10);
-    const durationMinutes = parseInt(document.getElementById("duration-select").value, 10);
     const [startHour, endHour] = document
       .getElementById("hours-select")
       .value.split("-")
@@ -165,41 +268,21 @@ async function loadAvailability() {
     const rangeEndISO = days[days.length - 1].dayEnd.toISOString();
     const busyEvents = await fetchBusyEvents(token, rangeStartISO, rangeEndISO);
 
-    computedSlots = [];
+    allCells = [];
     const listEl = document.getElementById("slots-list");
     listEl.innerHTML = "";
 
     days.forEach(({ dayStart, dayEnd }) => {
-      const freeSlots = computeFreeSlots(dayStart, dayEnd, busyEvents, durationMinutes);
-      if (freeSlots.length === 0) return;
-
-      const groupEl = document.createElement("div");
-      groupEl.className = "day-group";
-      const heading = document.createElement("h3");
-      heading.textContent = formatDayLabel(dayStart);
-      groupEl.appendChild(heading);
-
-      freeSlots.forEach((slot) => {
-        const id = `slot-${computedSlots.length}`;
-        const label = `${formatTime(slot.start)} – ${formatTime(slot.end)}`;
-        computedSlots.push({ id, dayLabel: formatDayLabel(dayStart), label, checked: false });
-
-        const row = document.createElement("div");
-        row.className = "slot-item";
-        row.innerHTML = `<input type="checkbox" id="${id}" /><label for="${id}">${label}</label>`;
-        row.querySelector("input").addEventListener("change", (e) => {
-          const s = computedSlots.find((s) => s.id === id);
-          s.checked = e.target.checked;
-          updateInsertButton();
-        });
-        groupEl.appendChild(row);
+      const dayEvents = busyEvents.filter((e) => {
+        const start = new Date(e.start.dateTime);
+        const end = new Date(e.end.dateTime);
+        return end > dayStart && start < dayEnd;
       });
-
-      listEl.appendChild(groupEl);
+      listEl.appendChild(renderDayTimeline(dayStart, dayEnd, dayEvents));
     });
 
-    if (computedSlots.length === 0) {
-      showError("No open slots found in that range with those business hours.");
+    if (allCells.length === 0) {
+      showError("No open time found in that range with those business hours.");
     }
 
     document.getElementById("slots-section").classList.remove("hidden");
@@ -208,24 +291,42 @@ async function loadAvailability() {
     showError("Couldn't load your calendar: " + err.message);
   } finally {
     loadBtn.disabled = false;
-    loadBtn.textContent = "Find open times";
+    loadBtn.textContent = "Show my calendar";
   }
 }
 
 function updateInsertButton() {
-  const anyChecked = computedSlots.some((s) => s.checked);
+  const anyChecked = allCells.some((c) => c.selected);
   document.getElementById("insert-btn").disabled = !anyChecked;
+}
+
+// Merges adjacent selected 30-min cells (same day, back-to-back) into single ranges.
+function mergedSelectedRanges() {
+  const selected = allCells
+    .filter((c) => c.selected)
+    .sort((a, b) => a.start - b.start);
+
+  const ranges = [];
+  selected.forEach((c) => {
+    const last = ranges[ranges.length - 1];
+    if (last && last.dayLabel === c.dayLabel && last.end.getTime() === c.start.getTime()) {
+      last.end = c.end;
+    } else {
+      ranges.push({ dayLabel: c.dayLabel, start: c.start, end: c.end });
+    }
+  });
+  return ranges;
 }
 
 function insertIntoEmail() {
   clearError();
-  const chosen = computedSlots.filter((s) => s.checked);
-  if (chosen.length === 0) return;
+  const ranges = mergedSelectedRanges();
+  if (ranges.length === 0) return;
 
   const byDay = {};
-  chosen.forEach((s) => {
-    if (!byDay[s.dayLabel]) byDay[s.dayLabel] = [];
-    byDay[s.dayLabel].push(s.label);
+  ranges.forEach((r) => {
+    if (!byDay[r.dayLabel]) byDay[r.dayLabel] = [];
+    byDay[r.dayLabel].push(`${formatTime(r.start)} – ${formatTime(r.end)}`);
   });
 
   let text = "Here are some times that work on my end:\n\n";
