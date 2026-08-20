@@ -61,7 +61,25 @@ h1 { font-size: 16px; margin: 0 0 4px; color: var(--accent); }
 #slots-section { margin-top: 18px; }
 .hint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 
-.day-group { margin-bottom: 12px; }
+#calendar-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+#calendar-legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+#calendar-legend .swatch.busy { background: #d8dcd9; border: 1px solid var(--border); }
+#calendar-legend .swatch.selected { background: var(--accent); }
+
+.day-group { margin-bottom: 20px; }
 .day-group h3 {
   font-size: 13px;
   margin: 0 0 6px;
@@ -70,7 +88,78 @@ h1 { font-size: 16px; margin: 0 0 4px; color: var(--accent); }
   padding-bottom: 4px;
 }
 
-.slot-item { display: flex; align-items: center; padding: 5px 2px; font-size: 13px; }
-.slot-item input { margin-right: 8px; }
+.timeline {
+  position: relative;
+  margin-left: 38px;
+  border-left: 1px solid var(--border);
+  background: white;
+}
+
+.hour-mark {
+  position: absolute;
+  left: -38px;
+  width: 34px;
+  right: 0;
+  border-top: 1px solid var(--border);
+}
+.hour-mark:first-child { border-top: none; }
+.hour-mark .hour-label {
+  position: absolute;
+  top: -6px;
+  left: 0;
+  width: 34px;
+  font-size: 9px;
+  color: var(--muted);
+  background: var(--bg);
+  padding-right: 2px;
+  text-align: right;
+}
+
+.past-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    #f1f1ee,
+    #f1f1ee 6px,
+    #e8e7e2 6px,
+    #e8e7e2 12px
+  );
+}
+
+.busy-block {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  background: #d8dcd9;
+  border: 1px solid #c3c9c4;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.free-cell {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 3px;
+  border: 1px dashed var(--border);
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 4px;
+  cursor: pointer;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.free-cell:hover { background: #eef3ee; border-color: var(--accent); }
+.free-cell.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
 
 .error { color: #b3261e; font-size: 12px; margin-top: 12px; }
